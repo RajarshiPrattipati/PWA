@@ -4,6 +4,8 @@ from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.http.request import validate_host
 
+from ...graphql.core.utils.error_codes import CommonErrorCode
+
 
 def validate_storefront_url(url):
     """Validate the storefront URL.
@@ -14,11 +16,19 @@ def validate_storefront_url(url):
     try:
         parsed_url = urlparse(url)
     except ValueError as error:
-        raise ValidationError({"redirectUrl": str(error)})
+        raise ValidationError(
+            {
+                "redirectUrl": ValidationError(
+                    str(error), code=CommonErrorCode.INVALID_STOREFRONT_URL
+                )
+            }
+        )
     if not validate_host(parsed_url.netloc, settings.ALLOWED_STOREFRONT_HOSTS):
         raise ValidationError(
             {
-                "redirectUrl": "%s this is not valid storefront address."
-                % parsed_url.netloc
+                "redirectUrl": ValidationError(
+                    "%s this is not valid storefront address." % parsed_url.netloc,
+                    code=CommonErrorCode.INVALID_STOREFRONT_URL,
+                )
             }
         )
