@@ -26,6 +26,8 @@ from saleor.graphql.account.mutations.staff import (
     UserDelete,
 )
 from saleor.graphql.core.enums import PermissionEnum
+from saleor.graphql.core.utils import str_to_enum
+from saleor.graphql.core.utils.error_codes import AccountErrorCode
 from saleor.order.models import FulfillmentStatus, Order
 from tests.api.utils import get_graphql_content
 from tests.utils import create_image
@@ -1414,6 +1416,7 @@ SET_PASSWORD_MUTATION = """
             errors {
                 field
                 message
+                code
             }
             user {
                 id
@@ -1449,6 +1452,7 @@ def test_set_password_invalid_token(user_api_client, customer_user):
     content = get_graphql_content(response)
     errors = content["data"]["setPassword"]["errors"]
     assert errors[0]["message"] == INVALID_TOKEN
+    assert errors[0]["code"] == AccountErrorCode.INVALID_USER_TOKEN.name
 
 
 def test_set_password_invalid_email(user_api_client):
@@ -1458,6 +1462,7 @@ def test_set_password_invalid_email(user_api_client):
     errors = content["data"]["setPassword"]["errors"]
     assert len(errors) == 1
     assert errors[0]["field"] == "email"
+    assert errors[0]["code"] == AccountErrorCode.NOT_USERS_ADDRESS.name
 
 
 def test_set_password_invalid_password(user_api_client, customer_user, settings):
@@ -1479,7 +1484,9 @@ def test_set_password_invalid_password(user_api_client, customer_user, settings)
         errors[0]["message"]
         == "This password is too short. It must contain at least 5 characters."
     )
+    assert errors[0]["code"] == str_to_enum("password_too_short")
     assert errors[1]["message"] == "This password is entirely numeric."
+    assert errors[1]["code"] == str_to_enum("password_entirely_numeric")
 
 
 @patch("saleor.account.emails._send_user_password_reset_email.delay")
@@ -1520,6 +1527,7 @@ def test_password_reset_email_non_existing_user(
             errors {
                 field
                 message
+                code
             }
         }
     }
@@ -1532,7 +1540,11 @@ def test_password_reset_email_non_existing_user(
     content = get_graphql_content(response)
     data = content["data"]["passwordReset"]
     assert data["errors"] == [
-        {"field": "email", "message": "User with this email doesn't exist"}
+        {
+            "field": "email",
+            "message": "User with this email doesn't exist",
+            "code": AccountErrorCode.USER_DOES_NOT_EXIST.name,
+        }
     ]
     send_password_reset_mock.assert_not_called()
 
